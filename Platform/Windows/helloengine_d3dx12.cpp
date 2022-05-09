@@ -53,15 +53,17 @@ using namespace DirectX;
 using namespace DirectX::PackedVector;
 using namespace Microsoft::WRL;
 
-const uint32_t nScreenWidth    =  1080;
-const uint32_t nScreenHeight   =  720;
+const uint32_t nScreenWidth    =  960;
+const uint32_t nScreenHeight   =  480;
 
 const uint32_t nFrameCount     = 2;
 
 // global declarations
 D3D12_VIEWPORT                  g_ViewPort = {0.0f, 0.0f, 
                                      static_cast<float>(nScreenWidth), 
-                                     static_cast<float>(nScreenHeight)};   // viewport structure
+                                     static_cast<float>(nScreenHeight),
+                                     0.0f, 
+                                     1.0f};   // viewport structure
 D3D12_RECT                      g_ScissorRect = {0, 0, 
                                      nScreenWidth, 
                                      nScreenHeight};                // scissor rect structure
@@ -878,7 +880,7 @@ void PopulateCommandList()
 // this is the function used to update the constants
 void Update()
 {
-    const float rotationSpeed = XM_PI * 2.0 / 120;
+    const float rotationSpeed = XM_PI * 2.0 / 720;
     static float rotationAngle = 0.0f;
     
     rotationAngle += rotationSpeed;
