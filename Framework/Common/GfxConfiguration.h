@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include <stdint.h>
 #include <iostream>
 
 namespace My {
@@ -34,7 +34,7 @@ namespace My {
 		uint32_t screenHeight;
         const char* appName;
 
-        friend std::wostream& operator<<(std::wostream& out, const GfxConfiguration& conf)
+        friend std::ostream& operator<<(std::ostream& out, const GfxConfiguration& conf)
         { 
             out << "App Name:" << conf.appName << std::endl;
             out << "GfxConfiguration:" << 
