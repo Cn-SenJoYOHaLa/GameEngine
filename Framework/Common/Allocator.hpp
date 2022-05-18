@@ -1,5 +1,5 @@
 #include <cstddef>
-#include <cstdint>
+#include <stdint.h>
 
 namespace My {
 
@@ -22,6 +22,7 @@ namespace My {
                 static const uint8_t PATTERN_ALLOC = 0xFD;
                 static const uint8_t PATTERN_FREE  = 0xFE;
 
+                Allocator();
                 Allocator(size_t data_size, size_t page_size, size_t alignment);
                 ~Allocator();
 
@@ -69,3 +70,4 @@ namespace My {
                 Allocator &operator=(const Allocator &rhs);
     };
 }
+

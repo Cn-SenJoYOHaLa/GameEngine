@@ -13,8 +13,11 @@ My::BaseApplication::BaseApplication(GfxConfiguration& cfg)
 // Parse command line, read configuration, initialize all sub modules
 int My::BaseApplication::Initialize()
 {
-    std::cout << m_Config;
-    return 0;
+    int result = 0;
+
+    std::wcout << m_Config;
+
+	return result;
 }
 
 
@@ -31,5 +34,6 @@ void My::BaseApplication::Tick()
 
 bool My::BaseApplication::IsQuit()
 {
-    return m_bQuit;
+	return m_bQuit;
 }
+

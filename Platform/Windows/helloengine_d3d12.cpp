@@ -12,6 +12,7 @@
 #include <DirectXMath.h>
 #include <DirectXPackedVector.h>
 #include <DirectXColors.h>
+#include "DirectXMath.h"
 
 #include <wrl/client.h>
 
@@ -61,9 +62,7 @@ const uint32_t nFrameCount     = 2;
 // global declarations
 D3D12_VIEWPORT                  g_ViewPort = {0.0f, 0.0f, 
                                      static_cast<float>(nScreenWidth), 
-                                     static_cast<float>(nScreenHeight),
-                                     0.0f, 
-                                     1.0f};   // viewport structure
+                                     static_cast<float>(nScreenHeight)};   // viewport structure
 D3D12_RECT                      g_ScissorRect = {0, 0, 
                                      nScreenWidth, 
                                      nScreenHeight};                // scissor rect structure
@@ -454,7 +453,6 @@ void InitPipeline() {
     psod.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     psod.NumRenderTargets = 1;
     psod.RTVFormats[0]  = DXGI_FORMAT_R8G8B8A8_UNORM;
-    psod.DSVFormat = DXGI_FORMAT_D32_FLOAT;
     psod.SampleDesc.Count = 1;
 
     ThrowIfFailed(g_pDev->CreateGraphicsPipelineState(&psod, IID_PPV_ARGS(&g_pPipelineState)));
@@ -880,7 +878,7 @@ void PopulateCommandList()
 // this is the function used to update the constants
 void Update()
 {
-    const float rotationSpeed = XM_PI * 2.0 / 720;
+    const float rotationSpeed = XM_PI * 2.0 / 120;
     static float rotationAngle = 0.0f;
     
     rotationAngle += rotationSpeed;
@@ -1028,3 +1026,4 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     if (!wasHandled) { result = DefWindowProc (hWnd, message, wParam, lParam); }
     return result;
 }
+

@@ -112,7 +112,7 @@ void InitGraphics() {
     VERTEX OurVertices[] =
     {
         {XMFLOAT3(0.0f, 0.5f, 0.0f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f)},
-        {XMFLOAT3(0.45f, -0.5f, 0.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f)},
+        {XMFLOAT3(0.45f, -0.5, 0.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f)},
         {XMFLOAT3(-0.45f, -0.5f, 0.0f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f)}
     };
 
@@ -168,6 +168,8 @@ HRESULT CreateGraphicsResources(HWND hWnd)
                                                     D3D_FEATURE_LEVEL_9_2,
                                                     D3D_FEATURE_LEVEL_9_1};
         D3D_FEATURE_LEVEL FeatureLevelSupported;
+
+        HRESULT hr = S_OK;
 
         // create a device, device context and swap chain using the information in the scd struct
         hr = D3D11CreateDeviceAndSwapChain(NULL,
@@ -235,7 +237,7 @@ void RenderFrame()
         g_pDevcon->IASetVertexBuffers(0, 1, &g_pVBuffer, &stride, &offset);
 
         // select which primtive type we are using
-        g_pDevcon->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        g_pDevcon->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         // draw the vertex buffer to the back buffer
         g_pDevcon->Draw(3, 0);
@@ -324,36 +326,37 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
 	case WM_CREATE:
 		wasHandled = true;
-          break;	
+        break;	
 
 	case WM_PAINT:
 		result = CreateGraphicsResources(hWnd);
-          RenderFrame();
+        	RenderFrame();
 		wasHandled = true;
-          break;
+        break;
 
 	case WM_SIZE:
 		if (g_pSwapchain != nullptr)
 		{
 		    DiscardGraphicsResources();
-			//g_pSwapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
+			g_pSwapchain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH);
 		}
 		wasHandled = true;
-          break;
+        break;
 
 	case WM_DESTROY:
 		DiscardGraphicsResources();
 		PostQuitMessage(0);
 		wasHandled = true;
-          break;
+        break;
 
     case WM_DISPLAYCHANGE:
-          InvalidateRect(hWnd, nullptr, false);
-          wasHandled = true;
-          break;
-     }
+        InvalidateRect(hWnd, nullptr, false);
+        wasHandled = true;
+        break;
+    }
 
     // Handle any messages the switch statement didn't
     if (!wasHandled) { result = DefWindowProc (hWnd, message, wParam, lParam); }
     return result;
 }
+
