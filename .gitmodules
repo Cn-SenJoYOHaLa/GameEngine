@@ -1,4 +1,2 @@
-[submodule "llvm"]
-	path = External/llvm
-	url = https://github.com/llvm-mirror/llvm.git
+
 
