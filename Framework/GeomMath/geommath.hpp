@@ -102,7 +102,7 @@ namespace My {
         Vector3Type<T>() {};
         Vector3Type<T>(const T& _v) : x(_v), y(_v), z(_v) {};
         Vector3Type<T>(const T& _x, const T& _y, const T& _z) : x(_x), y(_y), z(_z) {};
-
+        Vector3Type<T>(const T (&v3)[3]) : x(v3[0]), y(v3[1]), z(v3[2]) {};
         operator T*() { return data; };
         operator const T*() const { return static_cast<const T*>(data); };
     };
@@ -129,7 +129,7 @@ namespace My {
         Vector4Type<T>(const T& _x, const T& _y, const T& _z, const T& _w) : x(_x), y(_y), z(_z), w(_w) {};
         Vector4Type<T>(const Vector3Type<T>& v3) : x(v3.x), y(v3.y), z(v3.z), w(1.0f) {};
         Vector4Type<T>(const Vector3Type<T>& v3, const T& _w) : x(v3.x), y(v3.y), z(v3.z), w(_w) {};
-        Vector4Type<T>(const (&v4)[4]) : x(v4[0]), y(v4[1]), z(v4[2]), w(v4[3]) {};
+        Vector4Type<T>(const T (&v4)[4]) : x(v4[0]), y(v4[1]), z(v4[2]), w(v4[3]) {};
         Vector4Type<T>(const T* _array4) : x(*_array4), y(*(_array4 + 1)), z(*(_array4 + 2)), w(*(_array4 + 3)) {};
         
         operator T*() { return data; };
@@ -195,10 +195,11 @@ namespace My {
         return result;
     }
 
-    template<template <typename> class TT, typename T>
-    using EnableIf3DVector = std::enable_if_t<(sizeof(TT<T>) == 3 * sizeof(T))>;
+    //template<template <typename> class TT, typename T>
+    //using EnableIf3DVector = std::enable_if_t<(sizeof(TT<T>) == 3 * sizeof(T))>;
 
-    template <template <typename> class TT, typename T, typename = EnableIf3DVector<TT, T>>
+    //template <template <typename> class TT, typename T, typename = EnableIf3DVector<TT, T>>
+    template <template <typename> class TT, typename T, typename = std::enable_if_t<(sizeof(TT<T>) == 3 * sizeof(T))>>
     inline void CrossProduct(TT<T>& result, const TT<T>& vec1, const TT<T>& vec2)
     {
         result.x = vec1.y * vec2.z - vec1.z * vec2.y;
@@ -364,7 +365,7 @@ namespace My {
     inline void Normalize(T& result)
     {
         float length;
-        DotProduct(length, result.data, result.data);
+        DotProduct(length, result, result);
         length = 1.0f / sqrt(length);
         for (size_t i = 0; i < countof(result.data); i++)
         {

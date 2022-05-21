@@ -6,4 +6,4 @@ MemoryManager.cpp
 main.cpp
 )
 
-target_link_libraries(Common GeomMath)
+target_link_libraries(Common)
