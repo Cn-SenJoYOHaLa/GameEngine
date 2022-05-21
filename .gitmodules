@@ -1,0 +1,5 @@
+
+
+[submodule "External/ispc"]
+	path = External/ispc
+	url = https://github.com/netwarm007/ispc.git
