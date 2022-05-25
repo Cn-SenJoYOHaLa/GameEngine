@@ -323,48 +323,6 @@ namespace My {
     template <typename T, int Da, int Db, int Dc>
     void MatrixMultiply(Matrix<T, Da, Dc>& result, const Matrix<T, Da, Db>& matrix1, const Matrix<T, Dc, Db>& matrix2)
     {
-        // result[0] = (matrix1[0] * matrix2[0]) + (matrix1[1] * matrix2[4]) + (matrix1[2] * matrix2[8]) + (matrix1[3] * matrix2[12]);
-        // result[1] = (matrix1[0] * matrix2[1]) + (matrix1[1] * matrix2[5]) + (matrix1[2] * matrix2[9]) + (matrix1[3] * matrix2[13]);
-        // result[2] = (matrix1[0] * matrix2[2]) + (matrix1[1] * matrix2[6]) + (matrix1[2] * matrix2[10]) + (matrix1[3] * matrix2[14]);
-        // result[3] = (matrix1[0] * matrix2[3]) + (matrix1[1] * matrix2[7]) + (matrix1[2] * matrix2[11]) + (matrix1[3] * matrix2[15]);
-
-        // result[4] = (matrix1[4] * matrix2[0]) + (matrix1[5] * matrix2[4]) + (matrix1[6] * matrix2[8]) + (matrix1[7] * matrix2[12]);
-        // result[5] = (matrix1[4] * matrix2[1]) + (matrix1[5] * matrix2[5]) + (matrix1[6] * matrix2[9]) + (matrix1[7] * matrix2[13]);
-        // result[6] = (matrix1[4] * matrix2[2]) + (matrix1[5] * matrix2[6]) + (matrix1[6] * matrix2[10]) + (matrix1[7] * matrix2[14]);
-        // result[7] = (matrix1[4] * matrix2[3]) + (matrix1[5] * matrix2[7]) + (matrix1[6] * matrix2[11]) + (matrix1[7] * matrix2[15]);
-
-        // result[8] = (matrix1[8] * matrix2[0]) + (matrix1[9] * matrix2[4]) + (matrix1[10] * matrix2[8]) + (matrix1[11] * matrix2[12]);
-        // result[9] = (matrix1[8] * matrix2[1]) + (matrix1[9] * matrix2[5]) + (matrix1[10] * matrix2[9]) + (matrix1[11] * matrix2[13]);
-        // result[10] = (matrix1[8] * matrix2[2]) + (matrix1[9] * matrix2[6]) + (matrix1[10] * matrix2[10]) + (matrix1[11] * matrix2[14]);
-        // result[11] = (matrix1[8] * matrix2[3]) + (matrix1[9] * matrix2[7]) + (matrix1[10] * matrix2[11]) + (matrix1[11] * matrix2[15]);
-
-        // result[12] = (matrix1[12] * matrix2[0]) + (matrix1[13] * matrix2[4]) + (matrix1[14] * matrix2[8]) + (matrix1[15] * matrix2[12]);
-        // result[13] = (matrix1[12] * matrix2[1]) + (matrix1[13] * matrix2[5]) + (matrix1[14] * matrix2[9]) + (matrix1[15] * matrix2[13]);
-        // result[14] = (matrix1[12] * matrix2[2]) + (matrix1[13] * matrix2[6]) + (matrix1[14] * matrix2[10]) + (matrix1[15] * matrix2[14]);
-        // result[15] = (matrix1[12] * matrix2[3]) + (matrix1[13] * matrix2[7]) + (matrix1[14] * matrix2[11]) + (matrix1[15] * matrix2[15]);
-
-        // result[0] = Dot(matrix1[0], matrix2[0]) + Dot(matrix1[1], matrix2[4]) + Dot(matrix1[2], matrix2[8]) + Dot(matrix1[3], matrix2[12]);
-        
-        // result[1] = Dot(matrix1[0], matrix2[1]) + Dot(matrix1[1], matrix2[5]) + Dot(matrix1[2], matrix2[9]) + Dot(matrix1[3], matrix2[13]);
-        
-        // result[2] = Dot(matrix1[0], matrix2[2]) + Dot(matrix1[1], matrix2[6]) + Dot(matrix1[2], matrix2[10]) + Dot(matrix1[3], matrix2[14]);
-
-        // result[3] = Dot(matrix1[0], matrix2[3]) + Dot(matrix1[1], matrix2[7]) + Dot(matrix1[2], matrix2[11]) + Dot(matrix1[3], matrix2[15]);
-
-        // result[4] = Dot(matrix1[4], matrix2[0]) + Dot(matrix1[5], matrix2[4]) + Dot(matrix1[6], matrix2[8]) + Dot(matrix1[7], matrix2[12]); 
-        // result[5] = Dot(matrix1[4], matrix2[1]) + Dot(matrix1[5], matrix2[5]) + Dot(matrix1[6], matrix2[9]) + Dot(matrix1[7], matrix2[13]);
-        // result[6] = Dot(matrix1[4], matrix2[2]) + Dot(matrix1[5], matrix2[6]) + Dot(matrix1[6], matrix2[10]) + Dot(matrix1[7], matrix2[14]);
-        // result[7] = Dot(matrix1[4], matrix2[3]) + Dot(matrix1[5], matrix2[7]) + Dot(matrix1[6], matrix2[11]) + Dot(matrix1[7], matrix2[15]);
-
-        // result[8] = Dot(matrix1[8], matrix2[0]) + Dot(matrix1[9], matrix2[4]) + Dot(matrix1[10], matrix2[8]) + Dot(matrix1[11], matrix2[12]);
-        // result[9] = Dot(matrix1[8], matrix2[1]) + Dot(matrix1[9], matrix2[5]) + Dot(matrix1[10], matrix2[9]) + Dot(matrix1[11], matrix2[13]);
-        // result[10] = Dot(matrix1[8], matrix2[2]) + Dot(matrix1[9], matrix2[6]) + Dot(matrix1[10], matrix2[10]) + Dot(matrix1[11], matrix2[14]);
-        // result[11] = Dot(matrix1[8], matrix2[3]) + Dot(matrix1[9], matrix2[7]) + Dot(matrix1[10], matrix2[11]) + Dot(matrix1[11], matrix2[15]);
-
-        // result[12] = Dot(matrix1[12], matrix2[0]) + Dot(matrix1[13], matrix2[4]) + Dot(matrix1[14], matrix2[8]) + Dot(matrix1[15], matrix2[12]);
-        // result[13] = Dot(matrix1[12], matrix2[1]) + Dot(matrix1[13], matrix2[5]) + Dot(matrix1[14], matrix2[9]) + Dot(matrix1[15], matrix2[13]);
-        // result[14] = Dot(matrix1[12], matrix2[2]) + Dot(matrix1[13], matrix2[6]) + Dot(matrix1[14], matrix2[10]) + Dot(matrix1[15], matrix2[14]);
-        // result[15] = Dot(matrix1[12], matrix2[3]) + Dot(matrix1[13], matrix2[7]) + Dot(matrix1[14], matrix2[11]) + Dot(matrix1[15], matrix2[15]);
         result[0][0] = (matrix1(0) * matrix2(0)) + (matrix1(1) * matrix2(4)) + (matrix1(2) * matrix2(8)) + (matrix1(3) * matrix2(12));
         result[0][1] = (matrix1(0) * matrix2(1)) + (matrix1(1) * matrix2(5)) + (matrix1(2) * matrix2(9)) + (matrix1(3) * matrix2(13));
         result[0][2] = (matrix1(0) * matrix2(2)) + (matrix1(1) * matrix2(6)) + (matrix1(2) * matrix2(10)) + (matrix1(3) * matrix2(14));

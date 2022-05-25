@@ -62,7 +62,9 @@ const uint32_t nFrameCount     = 2;
 // global declarations
 D3D12_VIEWPORT                  g_ViewPort = {0.0f, 0.0f, 
                                      static_cast<float>(nScreenWidth), 
-                                     static_cast<float>(nScreenHeight)};   // viewport structure
+                                     static_cast<float>(nScreenHeight),
+                                     0.0f,
+                                     1.0f};   // viewport structure
 D3D12_RECT                      g_ScissorRect = {0, 0, 
                                      nScreenWidth, 
                                      nScreenHeight};                // scissor rect structure
