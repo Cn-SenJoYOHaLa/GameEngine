@@ -63,13 +63,15 @@ void* My::Allocator::Allocate()
 
         if (m_pPageList) {
             pNewPage->pNext = m_pPageList;
+        } else {
+            pNewPage->pNext = nullptr;
         }
 
         m_pPageList = pNewPage;
 
         BlockHeader* pBlock = pNewPage->Blocks();
         // link each block in the page
-        for (uint32_t i = 0; i < m_nBlocksPerPage; i++) {
+        for (uint32_t i = 0; i < m_nBlocksPerPage - 1; i++) {
             pBlock->pNext = NextBlock(pBlock);
             pBlock = NextBlock(pBlock);
         }

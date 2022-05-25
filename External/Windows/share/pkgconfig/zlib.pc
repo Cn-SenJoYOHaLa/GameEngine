@@ -1,0 +1,13 @@
+prefix=I:/Repo/GameEngine/External
+exec_prefix=I:/Repo/GameEngine/External
+libdir=I:/Repo/GameEngine/External/Windows/lib
+sharedlibdir=I:/Repo/GameEngine/External/Windows/lib
+includedir=I:/Repo/GameEngine/External/Windows/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.11
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}
