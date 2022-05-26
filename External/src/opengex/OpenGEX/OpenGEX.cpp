@@ -88,6 +88,17 @@ Structure *OpenGexStructure::GetLastCoreSubnode(void) const
 	return (structure);
 }
 
+Structure *OpenGexStructure::GetFirstExtensionSubnode(void) const
+{
+	Structure *structure = GetFirstSubnode();
+	while ((structure) && (structure->GetStructureType() != kStructureExtension))
+	{
+		structure = structure->Next();
+	}
+
+	return (structure);
+}
+
 bool OpenGexStructure::ValidateSubstructure(const DataDescription *dataDescription, const Structure *structure) const
 {
 	return (structure->GetStructureType() == kStructureExtension);
@@ -538,10 +549,7 @@ DataResult TranslationStructure::ProcessData(DataDescription *dataDescription)
 		return (kDataOpenGexInvalidTranslationKind);
 	}
 
-	const float *data = &dataStructure->GetDataElement(0);
-
-	// Data is 1 or 3 floats depending on kind.
-	// Build application-specific transform here.
+	translationArray = &dataStructure->GetDataElement(0);
 
 	return (kDataOkay);
 }
@@ -617,10 +625,7 @@ DataResult RotationStructure::ProcessData(DataDescription *dataDescription)
 		return (kDataOpenGexInvalidRotationKind);
 	}
 
-	const float *data = &dataStructure->GetDataElement(0);
-
-	// Data is 1 or 4 floats depending on kind.
-	// Build application-specific transform here.
+	rotationArray = &dataStructure->GetDataElement(0);
 
 	return (kDataOkay);
 }
@@ -698,8 +703,7 @@ DataResult ScaleStructure::ProcessData(DataDescription *dataDescription)
 
 	const float *data = &dataStructure->GetDataElement(0);
 
-	// Data is 1 or 3 floats depending on kind.
-	// Build application-specific transform here.
+	scaleArray = &dataStructure->GetDataElement(0);
 
 	return (kDataOkay);
 }
@@ -2174,6 +2178,10 @@ DataResult LightObjectStructure::ProcessData(DataDescription *dataDescription)
 	else if (typeString == "spot")
 	{
 		// Prepare to handle spot light here.
+	}
+	else if (typeString == "area")
+	{
+		// Prepare to handle area light here.
 	}
 	else
 	{
