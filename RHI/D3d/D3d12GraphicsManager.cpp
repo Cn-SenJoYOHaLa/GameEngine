@@ -428,7 +428,16 @@ int  My::D3d12GraphicsManager::Initialize()
 {
     int result = 0;
 
-    result = static_cast<int>(CreateGraphicsResources());
+    const GfxConfiguration& config = g_pApp->GetConfiguration();
+        m_ViewPort = {0.0f,
+                      0.0f,
+                      static_cast<float>(config.screenWidth),
+                      static_cast<float>(config.screenHeight),
+                      0.0f,
+                      1.0f};
+        m_ScissorRect = {0, 0, static_cast<LONG>(config.screenWidth),
+                         static_cast<LONG>(config.screenHeight)};
+        result = static_cast<int>(CreateGraphicsResources());
 
     return result;
 }
