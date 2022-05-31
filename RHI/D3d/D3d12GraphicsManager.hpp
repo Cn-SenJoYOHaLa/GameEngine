@@ -19,12 +19,18 @@ namespace My {
         HRESULT CreateDescriptorHeaps();
         HRESULT CreateRenderTarget();
         HRESULT CreateDepthStencil();
+        HRESULT CreateCommandList();
         HRESULT CreateGraphicsResources();
         HRESULT CreateSamplerBuffer();
         HRESULT CreateConstantBuffer(const Buffer& buffer);
+        HRESULT CreateConstantBuffer();
+
+
         HRESULT CreateIndexBuffer(const Buffer& buffer);
         HRESULT CreateVertexBuffer(const Buffer& buffer);
         HRESULT CreateTextureBuffer(const Image& image);
+
+        HRESULT WaitForPreviousFrame(uint32_t frame_index);
 
     private:
         static const uint32_t           kFrameCount  = 2;
@@ -34,7 +40,8 @@ namespace My {
         IDXGISwapChain3*                m_pSwapChain = nullptr;             // the pointer to the swap chain interface
         ID3D12Resource*                 m_pRenderTargets[kFrameCount];      // the pointer to rendering buffer. [descriptor]
         ID3D12Resource*                 m_pDepthStencilBuffer;              // the pointer to the depth stencil buffer
-        ID3D12CommandAllocator*         m_pCommandAllocator = nullptr;      // the pointer to command buffer allocator
+        ID3D12CommandAllocator*         m_pGraphicsCommandAllocator[kFrameCount]; 
+        ID3D12GraphicsCommandList*      m_pGraphicsCommandList[kFrameCount];
         ID3D12CommandQueue*             m_pCommandQueue = nullptr;          // the pointer to command queue
         ID3D12RootSignature*            m_pRootSignature = nullptr;         // a graphics root signature defines what resources are bound to the pipeline
         ID3D12DescriptorHeap*           m_pRtvHeap = nullptr;               // an array of descriptors of GPU objects
@@ -56,10 +63,13 @@ namespace My {
         ID3D12Resource*                 m_pTextureBuffer = nullptr;         // the pointer to the texture buffer
         ID3D12Resource*                 m_pConstantUploadBuffer = nullptr;  // the pointer to the depth stencil buffer
 
+        uint8_t*                        m_pPerFrameCbvDataBegin[kFrameCount];
+        ID3D12Resource*                 m_pPerFrameConstantUploadBuffer[kFrameCount];
         // Synchronization objects
         uint32_t                        m_nFrameIndex;
-        HANDLE                          m_hFenceEvent;
+        HANDLE                          m_hGraphicsFenceEvent;;
         ID3D12Fence*                    m_pFence = nullptr;
-        uint32_t                        m_nFenceValue;
+        ID3D12Fence*                    m_pGraphicsFence[kFrameCount];
+        uint64_t                        m_nGraphicsFenceValue[kFrameCount];
     };
 }

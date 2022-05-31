@@ -22,6 +22,12 @@ namespace std {
 }
 #endif
 
+#ifdef ALIGN
+#undef ALIGN
+#endif
+
+#define ALIGN(x, a) (((x) + ((a)-1)) & ~((a)-1))
+
 template <typename T>
 T endian_native_unsigned_int(T net_number)
 {

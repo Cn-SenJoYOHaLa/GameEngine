@@ -1,12 +1,70 @@
 #include <objbase.h>
 #include <d3dcompiler.h>
+#include <iostream>
 #include "D3d12GraphicsManager.hpp"
 #include "WindowsApplication.hpp"
+#include "portable.hpp"
+#include <windows.h>
+#include <windowsx.h>
+#include "d3dx12.h"
+#include <d3dcompiler.h>
+#include <DXGI1_4.h>
+#include <wrl/client.h>
+#include <exception>
+
+
 
 using namespace My;
+using namespace std;
+using namespace Microsoft::WRL;
 
+wstring g_AssetsPath;
+
+std::wstring GetAssetFullPath(LPCWSTR assetName) {
+    return g_AssetsPath + assetName;
+}
+
+void GetAssetsPath(WCHAR* path, UINT pathSize) {
+    if (path == nullptr) {
+        throw std::exception();
+    }
+
+    DWORD size = GetModuleFileNameW(nullptr, path, pathSize);
+    if (size == 0 || size == pathSize) {
+        // Method failed or path was truncated.
+        throw std::exception();
+    }
+
+    WCHAR* lastSlash = wcsrchr(path, L'\\');
+    if (lastSlash) {
+        *(lastSlash + 1) = L'\0';
+    }
+}
 
 namespace My {
+
+    class com_exception : public std::exception {
+    public:
+        com_exception(HRESULT hr) : result(hr) {}
+
+        virtual const char* what() const override {
+            static char s_str[64] = {0};
+            sprintf_s(s_str, "Failure with HRESULT of %08X",
+                    static_cast<unsigned int>(result));
+            return s_str;
+        }
+
+    private:
+        HRESULT result;
+    };
+
+// Helper utility converts D3D API failures into exceptions.
+    inline void ThrowIfFailed(HRESULT hr) {
+        if (FAILED(hr)) {
+            throw com_exception(hr);
+        }
+    }
+
     extern IApplication* g_pApp;
 
 	template<class T>
@@ -38,7 +96,7 @@ namespace My {
 
            // Check to see if the adapter supports Direct3D 12, but don't create the
            // actual device yet.
-           if (SUCCEEDED(D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_11_0, __uuidof(ID3D12Device), nullptr)))
+           if (SUCCEEDED(D3D12CreateDevice(pAdapter, D3D_FEATURE_LEVEL_12_0, __uuidof(ID3D12Device), nullptr)))
            {
                break;
            }
@@ -96,9 +154,7 @@ HRESULT My::D3d12GraphicsManager::CreateDescriptorHeaps()
         return hr;
     }
 
-    if(FAILED(hr = m_pDev->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_pCommandAllocator)))) {
-        return hr;
-    }
+  
 
     return hr;
 }
@@ -181,6 +237,36 @@ HRESULT My::D3d12GraphicsManager::CreateDepthStencil()
 
     m_pDev->CreateDepthStencilView(m_pDepthStencilBuffer, &depthStencilDesc, m_pDsvHeap->GetCPUDescriptorHandleForHeapStart());
 
+    return hr;
+}
+
+HRESULT My::D3d12GraphicsManager::CreateCommandList()
+{
+    HRESULT hr = S_OK;
+    for (uint32_t i = 0; i < kFrameCount; i++)
+    {
+        if (FAILED(
+            hr = m_pDev->CreateCommandAllocator(
+                D3D12_COMMAND_LIST_TYPE_DIRECT,
+                IID_PPV_ARGS(&m_pGraphicsCommandAllocator[i]))
+            )
+        )
+        {
+            assert(0);
+            return hr;
+        }
+        m_pGraphicsCommandAllocator[i]->SetName((wstring(L"Graphics Command Allocator") + to_wstring(i)).c_str());
+        
+        hr = m_pDev->CreateCommandList(
+            0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pGraphicsCommandAllocator[i], NULL, IID_PPV_ARGS(&m_pGraphicsCommandList[i])
+        );
+
+        if (SUCCEEDED(hr)) {
+            m_pGraphicsCommandList[i]->SetName(
+                (wstring(L"Graphics Command List") + to_wstring(i)).c_str());
+        }
+
+    }
     return hr;
 }
 
@@ -315,6 +401,49 @@ HRESULT My::D3d12GraphicsManager::CreateConstantBuffer(const Buffer& buffer)
     return S_OK;
 }
 
+HRESULT My::D3d12GraphicsManager::CreateConstantBuffer()
+{
+    HRESULT hr;
+    D3D12_HEAP_PROPERTIES prop = {D3D12_HEAP_TYPE_UPLOAD,
+                                  D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+                                  D3D12_MEMORY_POOL_UNKNOWN, 1, 1};
+    
+    D3D12_RESOURCE_DESC resourceDesc{};
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Alignment = 0;
+    resourceDesc.Height = 1;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.Format = ::DXGI_FORMAT_UNKNOWN;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+    D3D12_RANGE readRange = {0, 0};
+
+    static const size_t kSizePerFrameConstantBuffer = ALIGN( sizeof(PerFrameConstants), 256); 
+    for (int32_t i = 0; i < kFrameCount; i++)
+    {
+        resourceDesc.Width = kSizePerFrameConstantBuffer;
+        if (FAILED(hr = m_pDev->CreateCommittedResource(
+                       &prop, D3D12_HEAP_FLAG_NONE, &resourceDesc,
+                       D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                       IID_PPV_ARGS(&m_pPerFrameConstantUploadBuffer[i])))) {
+            return hr;
+        }
+        hr = m_pPerFrameConstantUploadBuffer[i]->Map(
+            0, &readRange,
+            reinterpret_cast<void**>(&m_pPerFrameCbvDataBegin[i]));
+        m_pPerFrameConstantUploadBuffer[i]->SetName(
+            L"Per Frame Constant Buffer");
+    }
+    
+
+    return hr;
+}
+
+
 
 HRESULT My::D3d12GraphicsManager::CreateGraphicsResources()
 {
@@ -341,7 +470,7 @@ HRESULT My::D3d12GraphicsManager::CreateGraphicsResources()
 	GetHardwareAdapter(pFactory, &pHardwareAdapter);
 
 	if (FAILED(D3D12CreateDevice(pHardwareAdapter,
-		D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_pDev)))) {
+		D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&m_pDev)))) {
 
 		IDXGIAdapter* pWarpAdapter;
 		if (FAILED(hr = pFactory->EnumWarpAdapter(IID_PPV_ARGS(&pWarpAdapter)))) {
@@ -349,7 +478,7 @@ HRESULT My::D3d12GraphicsManager::CreateGraphicsResources()
             return hr;
         }
 
-        if(FAILED(hr = D3D12CreateDevice(pWarpAdapter, D3D_FEATURE_LEVEL_11_0,
+        if(FAILED(hr = D3D12CreateDevice(pWarpAdapter, D3D_FEATURE_LEVEL_12_0,
             IID_PPV_ARGS(&m_pDev)))) {
             SafeRelease(&pFactory);
             return hr;
@@ -409,6 +538,27 @@ HRESULT My::D3d12GraphicsManager::CreateGraphicsResources()
 
     m_nFrameIndex = m_pSwapChain->GetCurrentBackBufferIndex();
 
+    for (uint32_t i = 0; i < kFrameCount; i++)
+    {
+        if (FAILED(
+            hr = m_pDev->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+                                    IID_PPV_ARGS(&m_pGraphicsFence[i]))
+        ))
+        {
+            return hr;
+        }
+        
+    }
+    
+    memset(m_nGraphicsFenceValue, 0, sizeof(m_nGraphicsFenceValue));
+    m_hGraphicsFenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
+    if (m_hGraphicsFenceEvent == NULL)
+    {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+        if (FAILED(hr)) return hr;
+    }
+    
+    
     if (FAILED(hr = CreateDescriptorHeaps())) {
         return hr;
     }
@@ -421,6 +571,18 @@ HRESULT My::D3d12GraphicsManager::CreateGraphicsResources()
         return hr;
     }
 
+    if (FAILED(hr = CreateCommandList())) {
+        return hr;
+    }
+    
+    if (FAILED(hr = CreateConstantBuffer())) {
+        return hr;
+    }
+
+    if (FAILED(hr = CreateSamplerBuffer())) {
+        return hr;
+    }
+
     return hr;
 }
 
@@ -428,6 +590,10 @@ int  My::D3d12GraphicsManager::Initialize()
 {
     int result = 0;
 
+    WCHAR assetsPath[512];
+    GetAssetsPath(assetsPath, _countof(assetsPath));
+    g_AssetsPath =  assetsPath;
+    
     const GfxConfiguration& config = g_pApp->GetConfiguration();
         m_ViewPort = {0.0f,
                       0.0f,
@@ -442,8 +608,129 @@ int  My::D3d12GraphicsManager::Initialize()
     return result;
 }
 
+HRESULT My::D3d12GraphicsManager::WaitForPreviousFrame(uint32_t frame_index)
+{
+    HRESULT hr = S_OK;
+    // Wait until the previous frame is finished.
+    auto fence = m_nGraphicsFenceValue[frame_index];
+
+    if (m_pGraphicsFence[frame_index]->GetCompletedValue() < fence) {
+        if (FAILED(hr = m_pGraphicsFence[frame_index]->SetEventOnCompletion(
+                       fence, m_hGraphicsFenceEvent))) {
+            assert(0);
+            return hr;
+        }
+        WaitForSingleObject(m_hGraphicsFenceEvent, INFINITE);
+
+        // command list allocators can only be reset when the associated
+        // command lists have finished execution on the GPU; apps should use
+        // fences to determine GPU execution progress.
+        if (SUCCEEDED(hr = m_pGraphicsCommandAllocator[frame_index]->Reset())) {
+            // however, when ExecuteCommandList() is called on a particular
+            // command list, that command list can then be reset at any time and
+            // must be before re-recording.
+            hr = m_pGraphicsCommandList[frame_index]->Reset(
+                m_pGraphicsCommandAllocator[frame_index], NULL);
+        } else {
+            assert(0);
+        }
+    }
+
+    return hr;
+}
+
+struct ObjectConstants
+{
+    // 世界视图投影矩阵
+    Matrix4X4f WorldViewProj;
+    ObjectConstants(){BuildIdentityMatrix(WorldViewProj);};
+};
+
+static bool Init = false;
 void My::D3d12GraphicsManager::Tick()
 {
+    if (!Init)
+    {
+        Init = true;
+        CD3DX12_ROOT_PARAMETER slotRootPram[1];
+        CD3DX12_DESCRIPTOR_RANGE cbvTable;
+        cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+        slotRootPram[0].InitAsDescriptorTable(1, &cbvTable);
+        CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootPram, 0, nullptr,
+            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+        
+        ComPtr<ID3DBlob> serializedRootSig = nullptr;
+        ComPtr<ID3DBlob> errorBlob = nullptr;
+        // 序列化根签名
+        HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+            serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+        if (errorBlob != nullptr)
+        {
+            ::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+        }
+        ThrowIfFailed(hr);
+        ThrowIfFailed(m_pDev->CreateRootSignature(
+            0,
+            serializedRootSig->GetBufferPointer(),
+            serializedRootSig->GetBufferSize(),
+            IID_PPV_ARGS(&m_pRootSignature)));
+        
+        ComPtr<ID3DBlob> vertexShader;
+        ComPtr<ID3DBlob> pixelShader;
+      
+        D3DCompileFromFile(GetAssetFullPath(L"color.hlsl").c_str(), nullptr,
+                       D3D_COMPILE_STANDARD_FILE_INCLUDE, "VS", "vs_5_0",
+                       0, 0, &vertexShader, &errorBlob);
+
+        if (errorBlob) {
+            OutputDebugString((LPCTSTR)errorBlob->GetBufferPointer());
+            errorBlob->Release();
+            throw std::exception();
+        }
+
+        D3DCompileFromFile(GetAssetFullPath(L"color.hlsl").c_str(), nullptr,
+                       D3D_COMPILE_STANDARD_FILE_INCLUDE, "PS", "ps_5_0",
+                       0, 0, &pixelShader, &errorBlob);
+        if (errorBlob) {
+            OutputDebugString((LPCTSTR)errorBlob->GetBufferPointer());
+            errorBlob->Release();
+            throw std::exception();
+        }
+
+         D3D12_INPUT_ELEMENT_DESC ied[] = {
+            {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+            {"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+        };
+
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC psod = {};
+        psod.InputLayout = {ied, _countof(ied)};
+        psod.pRootSignature = m_pRootSignature;
+
+        psod.VS = {reinterpret_cast<UINT8*>(vertexShader->GetBufferPointer()),
+               vertexShader->GetBufferSize()};
+        psod.PS = {reinterpret_cast<UINT8*>(pixelShader->GetBufferPointer()),
+                pixelShader->GetBufferSize()};
+        psod.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+        psod.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+        psod.DepthStencilState.DepthEnable = FALSE;
+        psod.DepthStencilState.StencilEnable = FALSE;
+        psod.SampleMask = UINT_MAX;
+        psod.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+        psod.NumRenderTargets = 1;
+        psod.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+        psod.SampleDesc.Count = 1;
+        ThrowIfFailed(m_pDev->CreateGraphicsPipelineState(
+            &psod, IID_PPV_ARGS(&m_pPipelineState)));
+        
+        // ThrowIfFailed(m_pDev->CreateCommandList(
+        // 0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pGraphicsCommandAllocator[1],
+        // m_pPipelineState, IID_PPV_ARGS(&m_pCommandList)));
+
+     
+    }
+    
 }
 
 void My::D3d12GraphicsManager::Finalize()
@@ -455,9 +742,11 @@ void My::D3d12GraphicsManager::Finalize()
     SafeRelease(&m_pRtvHeap);
     SafeRelease(&m_pRootSignature);
     SafeRelease(&m_pCommandQueue);
-    SafeRelease(&m_pCommandAllocator);
+    
     for (uint32_t i = 0; i < kFrameCount; i++) {
-	    SafeRelease(&m_pRenderTargets[kFrameCount]);
+	    SafeRelease(&m_pRenderTargets[i]);
+        SafeRelease(&m_pGraphicsCommandList[i]);
+        SafeRelease(&m_pGraphicsCommandAllocator[i]);
     }
 	SafeRelease(&m_pSwapChain);
 	SafeRelease(&m_pDev);

@@ -1,6 +1,7 @@
 #pragma once
 #include "Image.hpp"
 #include "IRuntimeModule.hpp"
+#include "cbuffer.h"
 
 namespace My {
     class GraphicsManager : implements IRuntimeModule
