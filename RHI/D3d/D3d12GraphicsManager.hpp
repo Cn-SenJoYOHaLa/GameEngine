@@ -48,6 +48,9 @@ namespace My {
         ID3D12DescriptorHeap*           m_pDsvHeap = nullptr;               // an array of descriptors of GPU objects
         ID3D12DescriptorHeap*           m_pCbvSrvUavHeap;                   // an array of descriptors of GPU objects
         ID3D12DescriptorHeap*           m_pSamplerHeap;                     // an array of descriptors of GPU objects
+        
+        ID3D12DescriptorHeap*           m_pExtraCbvHeap = nullptr;
+        
         ID3D12PipelineState*            m_pPipelineState = nullptr;         // an object maintains the state of all currently set shaders
                                                                             // and certain fixed function state objects
                                                                             // such as the input assembler, tesselator, rasterizer and output manager
@@ -64,6 +67,7 @@ namespace My {
         ID3D12Resource*                 m_pConstantUploadBuffer = nullptr;  // the pointer to the depth stencil buffer
 
         uint8_t*                        m_pPerFrameCbvDataBegin[kFrameCount];
+        uint8_t*                        m_pCbvDataBegin;
         ID3D12Resource*                 m_pPerFrameConstantUploadBuffer[kFrameCount];
         // Synchronization objects
         uint32_t                        m_nFrameIndex;
@@ -71,5 +75,18 @@ namespace My {
         ID3D12Fence*                    m_pFence = nullptr;
         ID3D12Fence*                    m_pGraphicsFence[kFrameCount];
         uint64_t                        m_nGraphicsFenceValue[kFrameCount];
+
+
+        const bool VSYNC_ENABLED = true;
+        const float screenDepth = 1000.0f;
+        const float screenNear = 0.1f;
+
+        float m_positionX = 0, m_positionY = 0, m_positionZ = -10;
+        float m_rotationX = 0, m_rotationY = 0, m_rotationZ = 0;
+        Matrix4X4f m_worldMatrix;
+        Matrix4X4f m_viewMatrix;
+        Matrix4X4f m_projectionMatrix;
+
+        void CalculateCameraPosition();
     };
 }

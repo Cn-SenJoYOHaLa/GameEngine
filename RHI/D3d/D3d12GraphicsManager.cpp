@@ -4,6 +4,7 @@
 #include "D3d12GraphicsManager.hpp"
 #include "WindowsApplication.hpp"
 #include "portable.hpp"
+#include "Mesh.hpp"
 #include <windows.h>
 #include <windowsx.h>
 #include "d3dx12.h"
@@ -12,6 +13,8 @@
 #include <wrl/client.h>
 #include <exception>
 
+
+uint32_t g_nCbvSrvDescriptorSize;
 
 
 using namespace My;
@@ -22,6 +25,17 @@ wstring g_AssetsPath;
 
 std::wstring GetAssetFullPath(LPCWSTR assetName) {
     return g_AssetsPath + assetName;
+}
+
+class BoxMesh : public SimpleMesh {
+    BoxMesh(){
+
+    }
+};
+
+BoxMesh::BoxMesh()
+{
+    
 }
 
 void GetAssetsPath(WCHAR* path, UINT pathSize) {
@@ -154,7 +168,16 @@ HRESULT My::D3d12GraphicsManager::CreateDescriptorHeaps()
         return hr;
     }
 
-  
+    //test create an extra constant buffer descriptor heap
+    //GPU 堆的描述？
+    D3D12_DESCRIPTOR_HEAP_DESC ExtraCbvHeapDesc = {};
+    ExtraCbvHeapDesc.NumDescriptors = 1;
+    ExtraCbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    ExtraCbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+     if(FAILED(hr = m_pDev->CreateDescriptorHeap(&ExtraCbvHeapDesc, IID_PPV_ARGS(&m_pExtraCbvHeap)))) {
+        return hr;
+    }
+
 
     return hr;
 }
@@ -605,6 +628,20 @@ int  My::D3d12GraphicsManager::Initialize()
                          static_cast<LONG>(config.screenHeight)};
         result = static_cast<int>(CreateGraphicsResources());
 
+
+   // Initialize the world/model matrix to the identity matrix.
+    BuildIdentityMatrix(m_worldMatrix);
+
+    // Set the field of view and screen aspect ratio.
+    float fieldOfView = PI / 4.0f;
+    const GfxConfiguration& conf = g_pApp->GetConfiguration();
+
+    float screenAspect = (float)conf.screenWidth / (float)conf.screenHeight;
+
+    // Build the perspective projection matrix.
+    BuildPerspectiveFovLHMatrix(m_projectionMatrix, fieldOfView, screenAspect, screenNear, screenDepth);
+
+
     return result;
 }
 
@@ -727,10 +764,130 @@ void My::D3d12GraphicsManager::Tick()
         // ThrowIfFailed(m_pDev->CreateCommandList(
         // 0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_pGraphicsCommandAllocator[1],
         // m_pPipelineState, IID_PPV_ARGS(&m_pCommandList)));
-
+        m_pGraphicsCommandList[0]->SetPipelineState(m_pPipelineState);
      
+        
+        // constant buffer view
+        g_nCbvSrvDescriptorSize = m_pDev->GetDescriptorHandleIncrementSize(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+        size_t sizeConstantBuffer =
+            (sizeof(ObjectConstants) + 255) &
+            ~255;  // CB size is required to be 256-byte aligned.
+        ThrowIfFailed(m_pDev->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(sizeConstantBuffer),
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+            IID_PPV_ARGS(&m_pConstantUploadBuffer)));
+
+        for (uint32_t i = 0; i < kFrameCount; i++) {
+            CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle(
+                m_pExtraCbvHeap->GetCPUDescriptorHandleForHeapStart(), i + 1,
+                g_nCbvSrvDescriptorSize);
+            // Describe and create a constant buffer view.
+            D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+            cbvDesc.BufferLocation =
+                m_pConstantUploadBuffer->GetGPUVirtualAddress();
+            cbvDesc.SizeInBytes = sizeConstantBuffer;
+            m_pDev->CreateConstantBufferView(&cbvDesc, cbvHandle);
+        }
+
+        // Map and initialize the constant buffer. We don't unmap this until the
+        // app closes. Keeping things mapped for the lifetime of the resource is
+        // okay.
+        CD3DX12_RANGE readRange(
+            0, 0);  // We do not intend to read from this resource on the CPU.
+        ThrowIfFailed(m_pConstantUploadBuffer->Map(
+            0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+
+
+        ComPtr<ID3D12Resource>
+            pVertexBufferUploadHeap;  // the pointer to the vertex buffer
+        ComPtr<ID3D12Resource>
+            pIndexBufferUploadHeap;  // the pointer to the vertex buffer
+        ComPtr<ID3D12Resource>
+            pTextureUploadHeap;  // the pointer to the texture buffer
+        
+        
+        //上传vertex
+        ThrowIfFailed(m_pDev->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(torus.m_vertexBufferSize),
+            D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+            IID_PPV_ARGS(&m_pVertexBuffer)));
+
+        ThrowIfFailed(m_pDev->CreateCommittedResource(
+            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+            D3D12_HEAP_FLAG_NONE,
+            &CD3DX12_RESOURCE_DESC::Buffer(torus.m_vertexBufferSize),
+            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+            IID_PPV_ARGS(&pVertexBufferUploadHeap)));
+
+        // Copy data to the intermediate upload heap and then schedule a copy
+        // from the upload heap to the vertex buffer.
+        D3D12_SUBRESOURCE_DATA vertexData = {};
+        vertexData.pData = torus.m_vertexBuffer;
+        vertexData.RowPitch = torus.m_vertexStride;
+        vertexData.SlicePitch = vertexData.RowPitch;
+
+        UpdateSubresources<1>(m_pCommandList, m_pVertexBuffer,
+                              pVertexBufferUploadHeap.Get(), 0, 0, 1,
+                              &vertexData);
+        m_pCommandList->ResourceBarrier(
+            1, &CD3DX12_RESOURCE_BARRIER::Transition(
+                   m_pVertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
+                   D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+        // initialize the vertex buffer view
+        m_VertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
+        m_VertexBufferView.StrideInBytes  = torus.m_vertexStride;
+        m_VertexBufferView.SizeInBytes    = torus.m_vertexBufferSize;
+        
+        // index buffer
+        {
+            ThrowIfFailed(m_pDev->CreateCommittedResource(
+                &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+                D3D12_HEAP_FLAG_NONE,
+                &CD3DX12_RESOURCE_DESC::Buffer(torus.m_indexBufferSize),
+                D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                IID_PPV_ARGS(&m_pIndexBuffer)));
+
+            ThrowIfFailed(m_pDev->CreateCommittedResource(
+                &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                D3D12_HEAP_FLAG_NONE,
+                &CD3DX12_RESOURCE_DESC::Buffer(torus.m_indexBufferSize),
+                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                IID_PPV_ARGS(&pIndexBufferUploadHeap)));
+
+            // Copy data to the intermediate upload heap and then schedule a copy
+            // from the upload heap to the vertex buffer.
+            D3D12_SUBRESOURCE_DATA indexData = {};
+            indexData.pData = torus.m_indexBuffer;
+            indexData.RowPitch = torus.m_indexType;
+            indexData.SlicePitch = indexData.RowPitch;
+
+            UpdateSubresources<1>(m_pCommandList, m_pIndexBuffer,
+                                pIndexBufferUploadHeap.Get(), 0, 0, 1,
+                                &indexData);
+            m_pCommandList->ResourceBarrier(
+                1, &CD3DX12_RESOURCE_BARRIER::Transition(
+                    m_pIndexBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
+                    D3D12_RESOURCE_STATE_INDEX_BUFFER));
+
+            // initialize the vertex buffer view
+            m_IndexBufferView.BufferLocation =
+                m_pIndexBuffer->GetGPUVirtualAddress();
+            m_IndexBufferView.Format = DXGI_FORMAT_R16_UINT;
+            m_IndexBufferView.SizeInBytes = torus.m_indexBufferSize;
+
+        }
+
     }
-    
+    ObjectConstants objConstants;
+    objConstants.WorldViewProj = m_worldMatrix * m_viewMatrix * m_projectionMatrix;
+    memcpy(m_pCbvDataBegin, &objConstants,  sizeof(objConstants));
 }
 
 void My::D3d12GraphicsManager::Finalize()
@@ -752,4 +909,45 @@ void My::D3d12GraphicsManager::Finalize()
 	SafeRelease(&m_pDev);
 }
 
+void My::D3d12GraphicsManager::CalculateCameraPosition()
+{
+    Vector3f up, position, lookAt;
+    float yaw, pitch, roll;
+    Matrix4X4f rotationMatrix;
 
+
+    // Setup the vector that points upwards.
+    up.x = 0.0f;
+    up.y = 1.0f;
+    up.z = 0.0f;
+
+    // Setup the position of the camera in the world.
+    position.x = m_positionX;
+    position.y = m_positionY;
+    position.z = m_positionZ;
+
+    // Setup where the camera is looking by default.
+    lookAt.x = 0.0f;
+    lookAt.y = 0.0f;
+    lookAt.z = 1.0f;
+
+    // Set the yaw (Y axis), pitch (X axis), and roll (Z axis) rotations in radians.
+    pitch = m_rotationX * 0.0174532925f;
+    yaw   = m_rotationY * 0.0174532925f;
+    roll  = m_rotationZ * 0.0174532925f;
+
+    // Create the rotation matrix from the yaw, pitch, and roll values.
+    MatrixRotationYawPitchRoll(rotationMatrix, yaw, pitch, roll);
+
+    // Transform the lookAt and up vector by the rotation matrix so the view is correctly rotated at the origin.
+    TransformCoord(lookAt, rotationMatrix);
+    TransformCoord(up, rotationMatrix);
+
+    // Translate the rotated camera position to the location of the viewer.
+    lookAt.x = position.x + lookAt.x;
+    lookAt.y = position.y + lookAt.y;
+    lookAt.z = position.z + lookAt.z;
+
+    // Finally create the view matrix from the three updated vectors.
+    BuildViewMatrix(m_viewMatrix, position, lookAt, up);
+}
