@@ -27,15 +27,70 @@ std::wstring GetAssetFullPath(LPCWSTR assetName) {
     return g_AssetsPath + assetName;
 }
 
+std::array<Vertex, 8> _vertices =
+    {
+        Vertex({ Vector3f(-1.0f, -1.0f, -1.0f), Vector4f({ 1.000000000f, 1.000000000f, 1.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(-1.0f, +1.0f, -1.0f), Vector4f({ 0.000000000f, 0.000000000f, 0.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(+1.0f, +1.0f, -1.0f), Vector4f({ 1.000000000f, 0.000000000f, 0.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(+1.0f, -1.0f, -1.0f), Vector4f({ 0.000000000f, 0.501960814f, 0.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(-1.0f, -1.0f, +1.0f), Vector4f({ 0.000000000f, 0.000000000f, 1.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(-1.0f, +1.0f, +1.0f), Vector4f({ 1.000000000f, 1.000000000f, 0.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(+1.0f, +1.0f, +1.0f), Vector4f({ 0.000000000f, 1.000000000f, 1.000000000f, 1.000000000f }) }),
+		Vertex({ Vector3f(+1.0f, -1.0f, +1.0f), Vector4f({ 1.000000000f, 0.000000000f, 1.000000000f, 1.000000000f }) })
+    };
+
+    std::array<std::uint16_t, 36> _indices =
+	{
+		// front face
+		0, 1, 2,
+		0, 2, 3,
+
+		// back face
+		4, 6, 5,
+		4, 7, 6,
+
+		// left face
+		4, 5, 1,
+		4, 1, 0,
+
+		// right face
+		3, 2, 6,
+		3, 6, 7,
+
+		// top face
+		1, 5, 6,
+		1, 6, 2,
+
+		// bottom face
+		4, 0, 3,
+		4, 3, 7
+	};
+
+struct Vertex
+{
+    Vector3f Pos;
+    Vector4f Color;
+};
+
 class BoxMesh : public SimpleMesh {
+public:
     BoxMesh(){
 
     }
+
+    
 };
 
 BoxMesh::BoxMesh()
 {
-    
+    m_vertexBuffer = _vertices.data();
+    m_vertexCount = 8;
+    m_vertexBufferSize = _vertices.size() * sizeof(Vertex);
+    m_vertexStride = sizeof(Vertex);
+    m_indexBuffer = _indices.data();
+    m_indexCount = 36;
+    m_indexBufferSize = _indices.size() * sizeof(std::uint16_t);
+    m_indexType = kIndexSize16;
 }
 
 void GetAssetsPath(WCHAR* path, UINT pathSize) {
@@ -605,7 +660,7 @@ HRESULT My::D3d12GraphicsManager::CreateGraphicsResources()
     if (FAILED(hr = CreateSamplerBuffer())) {
         return hr;
     }
-
+    FlushCommandQueue();
     return hr;
 }
 
@@ -674,6 +729,29 @@ HRESULT My::D3d12GraphicsManager::WaitForPreviousFrame(uint32_t frame_index)
     }
 
     return hr;
+}
+
+void My::D3d12GraphicsManager::FlushCommandQueue()
+{
+    mCurrentFence++;
+
+    // Add an instruction to the command queue to set a new fence point.  Because we 
+	// are on the GPU timeline, the new fence point won't be set until the GPU finishes
+	// processing all the commands prior to this Signal().
+    ThrowIfFailed(m_pCommandQueue->Signal(m_pGraphicsFence[0], mCurrentFence));
+
+	// Wait until the GPU has completed commands up to this fence point.
+    if(m_pGraphicsFence[0]->GetCompletedValue() < mCurrentFence)
+	{
+		HANDLE eventHandle = CreateEventEx(nullptr, false, false, EVENT_ALL_ACCESS);
+
+        // Fire event when GPU hits current fence.  
+        ThrowIfFailed(m_pGraphicsFence[0]->SetEventOnCompletion(mCurrentFence, eventHandle));
+
+        // Wait until the GPU hits current fence event is fired.
+		WaitForSingleObject(eventHandle, INFINITE);
+        CloseHandle(eventHandle);
+	}
 }
 
 struct ObjectConstants
@@ -809,63 +887,66 @@ void My::D3d12GraphicsManager::Tick()
         ComPtr<ID3D12Resource>
             pTextureUploadHeap;  // the pointer to the texture buffer
         
-        
+        BoxMesh box;
         //上传vertex
-        ThrowIfFailed(m_pDev->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(torus.m_vertexBufferSize),
-            D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-            IID_PPV_ARGS(&m_pVertexBuffer)));
+        {
+            ThrowIfFailed(m_pDev->CreateCommittedResource(
+                &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+                D3D12_HEAP_FLAG_NONE,
+                &CD3DX12_RESOURCE_DESC::Buffer(box.m_vertexBufferSize),
+                D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+                IID_PPV_ARGS(&m_pVertexBuffer)));
 
-        ThrowIfFailed(m_pDev->CreateCommittedResource(
-            &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-            D3D12_HEAP_FLAG_NONE,
-            &CD3DX12_RESOURCE_DESC::Buffer(torus.m_vertexBufferSize),
-            D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-            IID_PPV_ARGS(&pVertexBufferUploadHeap)));
+            ThrowIfFailed(m_pDev->CreateCommittedResource(
+                &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                D3D12_HEAP_FLAG_NONE,
+                &CD3DX12_RESOURCE_DESC::Buffer(box.m_vertexBufferSize),
+                D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
+                IID_PPV_ARGS(&pVertexBufferUploadHeap)));
 
-        // Copy data to the intermediate upload heap and then schedule a copy
-        // from the upload heap to the vertex buffer.
-        D3D12_SUBRESOURCE_DATA vertexData = {};
-        vertexData.pData = torus.m_vertexBuffer;
-        vertexData.RowPitch = torus.m_vertexStride;
-        vertexData.SlicePitch = vertexData.RowPitch;
+            // Copy data to the intermediate upload heap and then schedule a copy
+            // from the upload heap to the vertex buffer.
+            D3D12_SUBRESOURCE_DATA vertexData = {};
+            vertexData.pData = box.m_vertexBuffer;
+            vertexData.RowPitch = box.m_vertexStride;
+            vertexData.SlicePitch = vertexData.RowPitch;
 
-        UpdateSubresources<1>(m_pCommandList, m_pVertexBuffer,
-                              pVertexBufferUploadHeap.Get(), 0, 0, 1,
-                              &vertexData);
-        m_pCommandList->ResourceBarrier(
-            1, &CD3DX12_RESOURCE_BARRIER::Transition(
-                   m_pVertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
-                   D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+            UpdateSubresources<1>(m_pCommandList, m_pVertexBuffer,
+                                pVertexBufferUploadHeap.Get(), 0, 0, 1,
+                                &vertexData);
+            m_pCommandList->ResourceBarrier(
+                1, &CD3DX12_RESOURCE_BARRIER::Transition(
+                    m_pVertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST,
+                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 
-        // initialize the vertex buffer view
-        m_VertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
-        m_VertexBufferView.StrideInBytes  = torus.m_vertexStride;
-        m_VertexBufferView.SizeInBytes    = torus.m_vertexBufferSize;
+            // initialize the vertex buffer view
+            m_VertexBufferView.BufferLocation = m_pVertexBuffer->GetGPUVirtualAddress();
+            m_VertexBufferView.StrideInBytes  = box.m_vertexStride;
+            m_VertexBufferView.SizeInBytes    = box.m_vertexBufferSize;
+        }
+      
         
         // index buffer
         {
             ThrowIfFailed(m_pDev->CreateCommittedResource(
                 &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
                 D3D12_HEAP_FLAG_NONE,
-                &CD3DX12_RESOURCE_DESC::Buffer(torus.m_indexBufferSize),
+                &CD3DX12_RESOURCE_DESC::Buffer(box.m_indexBufferSize),
                 D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
                 IID_PPV_ARGS(&m_pIndexBuffer)));
 
             ThrowIfFailed(m_pDev->CreateCommittedResource(
                 &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
                 D3D12_HEAP_FLAG_NONE,
-                &CD3DX12_RESOURCE_DESC::Buffer(torus.m_indexBufferSize),
+                &CD3DX12_RESOURCE_DESC::Buffer(box.m_indexBufferSize),
                 D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
                 IID_PPV_ARGS(&pIndexBufferUploadHeap)));
 
             // Copy data to the intermediate upload heap and then schedule a copy
             // from the upload heap to the vertex buffer.
             D3D12_SUBRESOURCE_DATA indexData = {};
-            indexData.pData = torus.m_indexBuffer;
-            indexData.RowPitch = torus.m_indexType;
+            indexData.pData = box.m_indexBuffer;
+            indexData.RowPitch = box.m_indexType;
             indexData.SlicePitch = indexData.RowPitch;
 
             UpdateSubresources<1>(m_pCommandList, m_pIndexBuffer,
@@ -880,14 +961,73 @@ void My::D3d12GraphicsManager::Tick()
             m_IndexBufferView.BufferLocation =
                 m_pIndexBuffer->GetGPUVirtualAddress();
             m_IndexBufferView.Format = DXGI_FORMAT_R16_UINT;
-            m_IndexBufferView.SizeInBytes = torus.m_indexBufferSize;
+            m_IndexBufferView.SizeInBytes = box.m_indexBufferSize;
 
         }
-
+        FlushCommandQueue();
     }
     ObjectConstants objConstants;
     objConstants.WorldViewProj = m_worldMatrix * m_viewMatrix * m_projectionMatrix;
     memcpy(m_pCbvDataBegin, &objConstants,  sizeof(objConstants));
+
+    //begin draw
+
+    {
+        ThrowIfFailed(m_pGraphicsCommandAllocator[0]->Reset());
+
+        // A command list can be reset after it has been added to the command queue via ExecuteCommandList.
+        // Reusing the command list reuses memory.
+        ThrowIfFailed(m_pGraphicsCommandList[0]->Reset(m_pGraphicsCommandAllocator[0], m_pPipelineState));
+
+        m_pGraphicsCommandList[0]->RSSetViewports(1, &m_ViewPort);
+        m_pGraphicsCommandList[0]->RSSetScissorRects(1, &m_ScissorRect);
+
+        // Indicate a state transition on the resource usage.
+        m_pGraphicsCommandList[0]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pRenderTargets[mCurrBackBuffer],
+            D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+        // Clear the back buffer and depth buffer.
+        m_pGraphicsCommandList[0]->ClearRenderTargetView(CurrentBackBufferView(), { 0.690196097f, 0.768627524f, 0.870588303f, 1.000000000f }, 0, nullptr);
+        m_pGraphicsCommandList[0]->ClearDepthStencilView(m_pDsvHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+        
+        // Specify the buffers we are going to render to.
+        m_pGraphicsCommandList[0]->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &m_pDsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+        ID3D12DescriptorHeap* descriptorHeaps[] = { m_pExtraCbvHeap };
+        m_pGraphicsCommandList[0]->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+        m_pGraphicsCommandList[0]->SetGraphicsRootSignature(m_pRootSignature);
+        m_pGraphicsCommandList[0]->SetGraphicsRootDescriptorTable(0, m_pExtraCbvHeap->GetGPUDescriptorHandleForHeapStart());
+
+        m_pGraphicsCommandList[0]->IASetVertexBuffers(0, 1, &m_VertexBufferView);
+        m_pGraphicsCommandList[0]->IASetIndexBuffer(&m_IndexBufferView);
+        m_pGraphicsCommandList[0]->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        
+
+        m_pGraphicsCommandList[0]->DrawIndexedInstanced(
+            0, 
+            1, 0, 0, 0);
+        
+        // Indicate a state transition on the resource usage.
+        m_pGraphicsCommandList[0]->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_pRenderTargets[mCurrBackBuffer],
+            D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+        // Done recording commands.
+        ThrowIfFailed(m_pGraphicsCommandList[0]->Close());
+    
+        // Add the command list to the queue for execution.
+        ID3D12CommandList* cmdsLists[] = { m_pGraphicsCommandList[0] };
+        m_pCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+        
+        // swap the back and front buffers
+        ThrowIfFailed(m_pSwapChain->Present(0, 0));
+        mCurrBackBuffer = (mCurrBackBuffer + 1) % 2;
+
+        // Wait until frame commands are complete.  This waiting is inefficient and is
+        // done for simplicity.  Later we will show how to organize our rendering code
+        // so we do not have to wait per frame.
+        FlushCommandQueue();
+    }
 }
 
 void My::D3d12GraphicsManager::Finalize()
@@ -950,4 +1090,12 @@ void My::D3d12GraphicsManager::CalculateCameraPosition()
 
     // Finally create the view matrix from the three updated vectors.
     BuildViewMatrix(m_viewMatrix, position, lookAt, up);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE My::D3d12GraphicsManager::CurrentBackBufferView() const
+{
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		m_pRtvHeap->GetCPUDescriptorHandleForHeapStart(),
+		mCurrBackBuffer,
+		m_nRtvDescriptorSize);
 }

@@ -31,7 +31,9 @@ namespace My {
         HRESULT CreateTextureBuffer(const Image& image);
 
         HRESULT WaitForPreviousFrame(uint32_t frame_index);
+        void FlushCommandQueue();
 
+        D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView() const;
     private:
         static const uint32_t           kFrameCount  = 2;
         ID3D12Device*                   m_pDev       = nullptr;             // the pointer to our Direct3D device interface
@@ -75,8 +77,8 @@ namespace My {
         ID3D12Fence*                    m_pFence = nullptr;
         ID3D12Fence*                    m_pGraphicsFence[kFrameCount];
         uint64_t                        m_nGraphicsFenceValue[kFrameCount];
-
-
+        uint64_t                        mCurrentFence = 0;
+        int                             mCurrBackBuffer = 0;
         const bool VSYNC_ENABLED = true;
         const float screenDepth = 1000.0f;
         const float screenNear = 0.1f;
